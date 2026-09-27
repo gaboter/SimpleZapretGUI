@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.venv/
+.venv*/
+build/
+dist/
+dist-installer/
+assets/icon.ico
+assets/_icon256.png
+data/
+*.log
