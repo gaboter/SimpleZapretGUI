@@ -25,6 +25,8 @@ DEFAULTS: dict[str, Any] = {
     "test_targets_selected": [],
     "health_interval": 60,
     "skipped_version": "",
+    "skipped_app_version": "",       # «Позже» для новой версии SimpleZapretGUI
+    "resume_after_update": "",       # стратегия, которую включить после самообновления
 }
 
 

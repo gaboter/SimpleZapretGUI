@@ -100,6 +100,14 @@ def create_mutex(name: str) -> None:
         _mutex_handle = ctypes.windll.kernel32.CreateMutexW(None, False, name)
 
 
+def release_mutex() -> None:
+    """Отпустить мьютекс перед самообновлением — иначе установщик будет ждать закрытия программы."""
+    global _mutex_handle
+    if IS_WINDOWS and _mutex_handle:
+        ctypes.windll.kernel32.CloseHandle(_mutex_handle)
+        _mutex_handle = None
+
+
 # ---------------------------------------------------------------- службы
 @dataclass
 class ServiceInfo:

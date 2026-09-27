@@ -34,6 +34,8 @@ class Controller(QObject):
     test_progress = Signal(int, int, str)    # сделано, всего, имя (для трея и панели задач)
     test_finished = Signal()
     health_checking = Signal(bool)
+    app_update_available = Signal(object)   # AppRelease — новая версия SimpleZapretGUI
+    quit_for_update = Signal()              # установщик запущен — приложению пора закрыться
 
     def __init__(self):
         super().__init__()
@@ -70,7 +72,14 @@ class Controller(QObject):
         QTimer.singleShot(1500, self.check_health)
         if self.settings.get("check_updates_on_start") or not self.zap.installed():
             QTimer.singleShot(800, lambda: self.check_updates(silent=True))
-        if self.zap.installed() and self.settings.get("auto_connect_on_start"):
+        if self.settings.get("check_updates_on_start"):
+            QTimer.singleShot(2500, lambda: self.check_app_update(silent=True))
+        resume = self.settings.get("resume_after_update")
+        if resume and self.zap.installed():
+            # обход работал до обновления программы — включаем его снова
+            self.settings.set("resume_after_update", "")
+            QTimer.singleShot(1500, lambda: self.connect(resume, "session"))
+        elif self.zap.installed() and self.settings.get("auto_connect_on_start"):
             QTimer.singleShot(1200, self._auto_connect)
 
     def _auto_connect(self):
@@ -423,6 +432,56 @@ class Controller(QObject):
                 finished()
 
         run_bg(updater.latest_version, done, fail)
+
+    # ------------------------------------------------------------ обновление самой программы
+    def check_app_update(self, silent: bool = True, finished: Optional[Callable] = None):
+        from ..core import selfupdate
+        from ..core.paths import APP_VERSION
+
+        def done(rel):
+            if rel and selfupdate.is_newer(rel.version):
+                if silent and rel.version == self.settings.get("skipped_app_version"):
+                    log.info(f"Доступна SimpleZapretGUI {rel.version} (отложено пользователем)")
+                else:
+                    log.warn(f"Доступна новая версия SimpleZapretGUI {rel.version} (у вас {APP_VERSION})")
+                    self.app_update_available.emit(rel)
+            elif not silent:
+                log.ok(f"SimpleZapretGUI {APP_VERSION} — последняя версия")
+            if finished:
+                finished()
+
+        def fail(msg):
+            (log.info if silent else log.warn)(f"Не удалось проверить обновления SimpleZapretGUI: {msg}")
+            if finished:
+                finished()
+
+        run_bg(selfupdate.latest_release, done, fail)
+
+    def install_app_update(self, rel, finished: Optional[Callable] = None):
+        """Скачать установщик новой версии, запустить его и закрыть приложение."""
+        import sys
+        from ..core import selfupdate, winutil
+        if not getattr(sys, "frozen", False):
+            winutil.open_path(rel.page)          # запуск из исходников: только открыть страницу релиза
+            if finished:
+                finished()
+            return
+
+        def work():
+            path = selfupdate.download_installer(rel, lambda d, n: self.update_progress.emit(d, n))
+            return path
+
+        def after(path):
+            self.update_progress.emit(0, 0)
+            st = self.status
+            if st.running and st.source == "app" and st.strategy:
+                self.settings.set("resume_after_update", st.strategy)
+            log.busy(f"Установка SimpleZapretGUI {rel.version}... Программа перезапустится сама")
+            winutil.release_mutex()
+            selfupdate.run_installer(path)
+            QTimer.singleShot(400, self.quit_for_update.emit)
+
+        self._action(f"Загрузка SimpleZapretGUI {rel.version}...", work, "", after, finished)
 
     def install_update(self, tag: str = "", finished: Optional[Callable] = None):
         tag = tag or self.latest_version

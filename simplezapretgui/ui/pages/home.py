@@ -7,6 +7,7 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (QFileDialog, QFrame, QHBoxLayout, QLabel, QMessageBox, QSizePolicy,
                                QVBoxLayout, QWidget)
 
+from ...core import winutil
 from .. import icons, theme
 from ..widgets import Dot, PowerButton, StrategyCombo, button, card, flow, hbox, label, vbox
 
@@ -84,6 +85,27 @@ class HomePage(QWidget):
         root = QVBoxLayout(self)
         root.setContentsMargins(22, 16, 22, 14)
         root.setSpacing(10)
+
+        # --- новая версия самого SimpleZapretGUI
+        self.app_banner = card("banner")
+        ab = QHBoxLayout(self.app_banner)
+        ab.setContentsMargins(14, 10, 10, 10)
+        ab.setSpacing(10)
+        self.app_banner_text = label("", wrap=True)
+        self.app_banner_text.setMinimumWidth(160)
+        self.app_notes_b = button("Что нового", "link")
+        self.app_notes_b.clicked.connect(lambda: self._app_rel and winutil.open_path(self._app_rel.page))
+        self.app_later_b = button("Позже", "link")
+        self.app_later_b.clicked.connect(self._app_later)
+        self.app_update_b = button("Обновить", "primary", icons.icon("download", "#06111D"))
+        self.app_update_b.clicked.connect(self._app_update)
+        ab.addWidget(icon_label("refresh", theme.ACCENT), 0, Qt.AlignVCenter)
+        ab.addWidget(self.app_banner_text, 1, Qt.AlignVCenter)
+        ab.addWidget(flow(self.app_notes_b, self.app_later_b, self.app_update_b, align_right=True),
+                     0, Qt.AlignVCenter)
+        self.app_banner.hide()
+        self._app_rel = None
+        root.addWidget(self.app_banner)
 
         # --- баннер обновления / установки
         self.banner = card("banner")
@@ -191,6 +213,7 @@ class HomePage(QWidget):
         ctl.health_checking.connect(self._health_checking)
         ctl.error_raised.connect(lambda _: self._render_notices(self.ctl.status, force=True))
         ctl.update_available.connect(self._on_update)
+        ctl.app_update_available.connect(self._on_app_update)
         ctl.installed_changed.connect(lambda _: self.reload())
         self.reload()
 
@@ -345,6 +368,25 @@ class HomePage(QWidget):
             self.banner.show()
         else:
             self.banner.hide()
+
+    def _on_app_update(self, rel):
+        from ...core.paths import APP_VERSION
+        self._app_rel = rel
+        self.app_banner_text.setText(f"Вышла новая версия SimpleZapretGUI {rel.version} (у вас {APP_VERSION}). "
+                                     "Обновление займёт минуту, настройки и zapret сохранятся.")
+        self.app_notes_b.setVisible(bool(rel.page))
+        self.app_banner.show()
+
+    def _app_later(self):
+        if self._app_rel:
+            self.ctl.settings.set("skipped_app_version", self._app_rel.version)
+        self.app_banner.hide()
+
+    def _app_update(self):
+        if not self._app_rel:
+            return
+        self.app_update_b.set_loading(True, "Загрузка…")
+        self.ctl.install_app_update(self._app_rel, lambda: self.app_update_b.set_loading(False))
 
     def _banner_action(self):
         self.banner_btn.set_loading(True, "Установка…")

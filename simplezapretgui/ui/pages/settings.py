@@ -68,8 +68,8 @@ class SettingsPage(QWidget):
                             s.get("mode") == "service")
         row("Подключаться при запуске", "Сразу включать последнюю выбранную стратегию.",
             "auto_connect_on_start")
-        row("Проверять обновления zapret при запуске", "В фоне, без браузера. Новая версия "
-            "предлагается баннером на главной.", "check_updates_on_start")
+        row("Проверять обновления при запуске", "И SimpleZapretGUI, и zapret — в фоне, без браузера. "
+            "Новая версия предлагается баннером на главной.", "check_updates_on_start")
         row("Закрывать в трей", "Крестик сворачивает окно в область уведомлений.", "close_to_tray")
         row("Останавливать обход при выходе", "Если обход запущен не как служба Windows. Служба работает всегда.",
             "stop_on_exit")
@@ -142,6 +142,9 @@ class SettingsPage(QWidget):
         gh.clicked.connect(lambda: winutil.open_path(RELEASES_PAGE))
         logs = button("Папка журналов", "link", icons.icon("folder", theme.ACCENT, size=14))
         logs.clicked.connect(lambda: winutil.open_path(str(LOG_DIR)))
+        self.app_upd = button("Проверить обновления программы", icon=icons.icon("refresh"))
+        self.app_upd.clicked.connect(self._check_app_update)
+        l3.addWidget(flow(self.app_upd))
         l3.addWidget(flow(app_gh, gh, logs))
         root.addWidget(c3)
         root.addStretch(1)
@@ -208,6 +211,10 @@ class SettingsPage(QWidget):
             self.ctl.push_error("Не удалось создать задачу автозапуска")
         else:
             log.ok("Автозапуск " + ("включён" if on else "выключен"))
+
+    def _check_app_update(self):
+        self.app_upd.set_loading(True, "Проверка…")
+        self.ctl.check_app_update(silent=False, finished=lambda: self.app_upd.set_loading(False))
 
     def _check_updates(self):
         self.upd.set_loading(True, "Проверка…")

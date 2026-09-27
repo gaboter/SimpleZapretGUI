@@ -267,6 +267,8 @@ class MainWindow(QMainWindow):
         ctl.update_available.connect(self._tray_update)
         ctl.test_progress.connect(self._test_progress)
         ctl.test_finished.connect(self._test_finished)
+        ctl.app_update_available.connect(self._tray_app_update)
+        ctl.quit_for_update.connect(lambda: self.quit(force=True))
 
     def current_key(self) -> str:
         w = self.stack.currentWidget()
@@ -321,6 +323,11 @@ class MainWindow(QMainWindow):
             self.tray.showMessage(APP_NAME, f"Доступна новая версия zapret {remote}",
                                   QSystemTrayIcon.Information, 5000)
 
+    def _tray_app_update(self, rel):
+        if not self.isVisible():
+            self.tray.showMessage(APP_NAME, f"Доступна новая версия SimpleZapretGUI {rel.version}",
+                                  icons.app_icon(self._arrow), 5000)
+
     def _tray_toggle(self):
         if self.ctl.status.running:
             self.ctl.disconnect()
@@ -356,9 +363,9 @@ class MainWindow(QMainWindow):
         e.ignore()
         self.quit()
 
-    def quit(self):
+    def quit(self, force: bool = False):
         st = self.ctl.status
-        if self.ctl.busy.startswith("Тест"):
+        if not force and self.ctl.busy.startswith("Тест"):
             if QMessageBox.question(self, APP_NAME, "Идёт автотест. Прервать и выйти?") != QMessageBox.Yes:
                 return
         if st.source == "app" and self.ctl.settings.get("stop_on_exit"):
