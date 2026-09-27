@@ -12,14 +12,20 @@
 ## Скачать
 
 **[⬇ Скачать последнюю версию](../../releases/latest)** — файл `SimpleZapretGUI-Setup-x.y.z.exe`.
+
 Нужна Windows 10 или 11 (64-бит).
 
-<summary>## Скриншоты
+<details>
+
+<summary>Скриншоты</summary>
+
 <img width="1002" height="761" alt="image" src="https://github.com/user-attachments/assets/5c7e4dcd-7781-42e6-9e09-9b03985f6a36" />
 <img width="1002" height="761" alt="image" src="https://github.com/user-attachments/assets/bdcd228b-c39a-4e9e-8a34-0baf58e9462e" />
 <img width="1158" height="943" alt="image" src="https://github.com/user-attachments/assets/2a2ad50c-db41-4b03-95b6-f54ee2395caa" />
 <img width="995" height="943" alt="image" src="https://github.com/user-attachments/assets/2a133f83-2fc8-4d10-b602-5f60ed38c688" />
-<img width="995" height="943" alt="image" src="https://github.com/user-attachments/assets/211605d9-b6a3-4321-b4f4-f68b19682f6d" /></summary>
+<img width="995" height="943" alt="image" src="https://github.com/user-attachments/assets/211605d9-b6a3-4321-b4f4-f68b19682f6d" />
+
+</details>
 
 
 ## Как начать
