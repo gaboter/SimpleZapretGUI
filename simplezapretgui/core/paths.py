@@ -1,7 +1,8 @@
 """Пути и константы приложения.
 
-Все данные лежат в %ProgramData%\\SimpleZapretGUI — путь без кириллицы и вне OneDrive,
-что важно для корректной работы winws/WinDivert.
+Все файлы программы — в папке data рядом с SimpleZapretGUI.exe, то есть там, куда
+пользователь установил программу (по умолчанию C:\\Program Files\\SimpleZapretGUI\\data).
+Установщик не даёт выбрать путь с кириллицей: с ним не работают winws/WinDivert.
 """
 from __future__ import annotations
 
@@ -39,12 +40,14 @@ def _data_root() -> Path:
     override = os.environ.get("SZG_DATA_DIR")
     if override:
         return Path(override)
-    if IS_WINDOWS:
-        return Path(os.environ.get("ProgramData", r"C:\ProgramData")) / APP_NAME
-    return Path.home() / ".simplezapretgui"
+    if getattr(sys, "frozen", False):                     # установленная программа
+        return Path(sys.executable).resolve().parent / "data"
+    return Path(__file__).resolve().parent.parent.parent / "data"   # запуск из исходников
 
 
 DATA_ROOT = _data_root()
+# где хранили данные версии 1.0.x — оттуда они один раз переносятся в DATA_ROOT
+LEGACY_ROOT = Path(os.environ.get("ProgramData", r"C:\ProgramData")) / APP_NAME if IS_WINDOWS else None
 ZAPRET_DIR = DATA_ROOT / "zapret"            # управляемая копия zapret
 USER_DIR = DATA_ROOT / "user"                # всё пользовательское (переживает обновления)
 USER_STRATEGIES_DIR = USER_DIR / "strategies"

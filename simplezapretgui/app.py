@@ -110,6 +110,11 @@ def _main() -> int:
     from .core.paths import APP_VERSION, DATA_ROOT
     log.info(f"Запуск {APP_NAME} {APP_VERSION} · Python {platform.python_version()} · "
              f"{platform.platform()} · админ: {'да' if _wu.is_admin() else 'нет'} · данные: {DATA_ROOT}")
+    try:                                   # данные версий 1.0.x — из ProgramData в папку программы
+        from .core.migrate import migrate_legacy
+        migrate_legacy()
+    except Exception:
+        log.trace(traceback.format_exc())
 
     from PySide6.QtCore import Qt
     from PySide6.QtGui import QFont
