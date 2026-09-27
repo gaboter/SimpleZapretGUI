@@ -1,4 +1,5 @@
 # [⬇ Скачать установщик](../../releases/latest) — файл `SimpleZapretGUI-Setup-x.y.z.exe`.
+Скачивайте файл SimpleZapretGUI-Setup-….exe из раздела Releases. «Code → Download ZIP» — это исходный код для разработчиков, для обычного использования он не нужен.
 
 ## SimpleZapretGUI
 
