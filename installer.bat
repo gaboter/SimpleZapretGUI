@@ -53,12 +53,24 @@ if not exist "dist-installer" mkdir "dist-installer"
 echo Adding a temporary Windows Defender exclusion for dist-installer...
 powershell -NoProfile -ExecutionPolicy Bypass -Command "try { Add-MpPreference -ExclusionPath '%~dp0dist-installer' -ErrorAction Stop; '  done' } catch { '  skipped - Windows Defender is not available' }"
 
+rem ---- version number: APP_VERSION in simplezapretgui\core\paths.py
+set "VER="
+if exist ".venv\Scripts\python.exe" (
+    for /f "usebackq delims=" %%v in (`".venv\Scripts\python.exe" tools\set_version.py`) do set "VER=%%v"
+)
+if not defined VER (
+    echo [ERROR] Could not read the version number - run build.bat first.
+    pause
+    exit /b 1
+)
+echo Version: %VER%
+
 set "ISS_OK="
 for %%i in (1 2 3) do (
     if not defined ISS_OK (
         echo.
         echo ---- Inno Setup, attempt %%i of 3 ----
-        "%ISCC%" installer\SimpleZapretGUI.iss
+        "%ISCC%" "/DAppVersion=%VER%" installer\SimpleZapretGUI.iss
         if not errorlevel 1 (
             set "ISS_OK=1"
         ) else (

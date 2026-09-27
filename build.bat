@@ -66,6 +66,8 @@ if errorlevel 1 (
 
 echo.
 echo ==== Step 3/4: SimpleZapretGUI.exe ====
+rem version number lives in simplezapretgui\core\paths.py (APP_VERSION); sync it into the exe properties
+"%VPY%" tools\set_version.py
 "%VPY%" tools\make_icon.py
 if errorlevel 1 (
     echo [ERROR] Could not create the icon.

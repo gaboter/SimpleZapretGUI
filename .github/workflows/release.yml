@@ -1,0 +1,104 @@
+name: release
+
+# Выпуск новой версии одной кнопкой: Actions → release → Run workflow → ввести номер (например 1.0.1).
+# Сценарий сам:
+#   1. проверит номер и что такого релиза ещё нет;
+#   2. запишет номер в код (APP_VERSION) и в свойства exe (version_info.txt);
+#   3. соберёт SimpleZapretGUI.exe и установщик с этим же номером;
+#   4. закоммитит новый номер в main, поставит тег vX.Y.Z;
+#   5. создаст релиз и приложит к нему установщик и portable-архив.
+# Если сборка упадёт — ни коммита, ни тега, ни релиза не будет.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Номер новой версии, например 1.0.1"
+        required: true
+      notes:
+        description: "Что нового (необязательно, появится в описании релиза)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency: release
+
+jobs:
+  release:
+    runs-on: windows-latest
+    env:
+      INPUT_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check version
+        shell: pwsh
+        run: |
+          $v = $env:INPUT_VERSION.Trim().TrimStart('v', 'V')
+          if ($v -notmatch '^\d+\.\d+\.\d+$') { Write-Error "Версия должна быть вида 1.2.3, получено: $v"; exit 1 }
+          if (git tag --list "v$v") { Write-Error "Версия v$v уже выпущена — укажите другой номер"; exit 1 }
+          "VERSION=$v" >> $env:GITHUB_ENV
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-build.txt
+
+      - name: Set version in code
+        run: python tools/set_version.py ${{ env.VERSION }}
+
+      - name: Generate icon
+        run: python tools/make_icon.py
+
+      - name: Build exe (PyInstaller)
+        run: pyinstaller --noconfirm --clean SimpleZapretGUI.spec
+
+      - name: Ensure Inno Setup
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup -y --no-progress }
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          for ($i = 1; $i -le 3; $i++) {
+            & $iscc "/DAppVersion=$env:VERSION" installer\SimpleZapretGUI.iss
+            if ($LASTEXITCODE -eq 0) { break }
+            if ($i -eq 3) { exit 1 }
+            Start-Sleep -Seconds 5
+          }
+
+      - name: Portable zip
+        shell: pwsh
+        run: Compress-Archive -Path dist\SimpleZapretGUI\* -DestinationPath "dist-installer\SimpleZapretGUI-portable-$env:VERSION.zip"
+
+      - name: Commit version and tag
+        shell: pwsh
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add simplezapretgui/core/paths.py version_info.txt
+          git diff --cached --quiet
+          if ($LASTEXITCODE -ne 0) { git commit -m "Версия $env:VERSION" }
+          git tag "v$env:VERSION"
+          git push origin "HEAD:${{ github.ref_name }}"
+          git push origin "v$env:VERSION"
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.VERSION }}
+          name: SimpleZapretGUI ${{ env.VERSION }}
+          body: ${{ inputs.notes }}
+          generate_release_notes: true
+          files: |
+            dist-installer/SimpleZapretGUI-Setup-${{ env.VERSION }}.exe
+            dist-installer/SimpleZapretGUI-portable-${{ env.VERSION }}.zip

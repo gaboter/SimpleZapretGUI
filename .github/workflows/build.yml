@@ -1,14 +1,12 @@
 name: build
 
+# Проверочная сборка при каждом пуше: установщик лежит в артефактах (вкладка Actions).
+# Релиз выпускается отдельным сценарием release.yml.
 on:
   push:
     branches: [main]
-    tags: ["v*"]
   pull_request:
   workflow_dispatch:
-
-permissions:
-  contents: write
 
 jobs:
   windows:
@@ -25,6 +23,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-build.txt
 
+      - name: Version
+        shell: pwsh
+        run: |
+          $v = python tools/set_version.py
+          "VERSION=$v" >> $env:GITHUB_ENV
+
       - name: Generate icon
         run: python tools/make_icon.py
 
@@ -39,12 +43,10 @@ jobs:
       - name: Build installer
         shell: pwsh
         run: |
-          $ver = "1.0.0"
-          if ($env:GITHUB_REF -like "refs/tags/v*") { $ver = $env:GITHUB_REF_NAME.Substring(1) }
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           # антивирус может держать свежий Setup.exe (EndUpdateResource failed) — пробуем до 3 раз
           for ($i = 1; $i -le 3; $i++) {
-            & $iscc "/DAppVersion=$ver" installer\SimpleZapretGUI.iss
+            & $iscc "/DAppVersion=$env:VERSION" installer\SimpleZapretGUI.iss
             if ($LASTEXITCODE -eq 0) { break }
             if ($i -eq 3) { exit 1 }
             Start-Sleep -Seconds 5
@@ -52,15 +54,9 @@ jobs:
 
       - name: Portable zip
         shell: pwsh
-        run: Compress-Archive -Path dist\SimpleZapretGUI\* -DestinationPath dist-installer\SimpleZapretGUI-portable.zip
+        run: Compress-Archive -Path dist\SimpleZapretGUI\* -DestinationPath "dist-installer\SimpleZapretGUI-portable-$env:VERSION.zip"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: SimpleZapretGUI
+          name: SimpleZapretGUI-${{ env.VERSION }}
           path: dist-installer/*
-
-      - name: Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: dist-installer/*
