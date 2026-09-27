@@ -89,7 +89,7 @@ QLineEdit, QPlainTextEdit, QTextEdit, QSpinBox, QComboBox {{
 }}
 QLineEdit:focus, QPlainTextEdit:focus, QSpinBox:focus, QComboBox:focus {{ border-color: {ACCENT}; }}
 QPlainTextEdit#code {{ font-family: "Cascadia Mono", "Consolas", monospace; font-size: 12px; }}
-QComboBox {{ padding-right: 30px; min-height: 18px; }}
+QComboBox {{ padding-right: 30px; min-height: 18px; combobox-popup: 0; }}
 QComboBox:hover {{ border-color: #33445A; }}
 QComboBox::drop-down {{ subcontrol-origin: padding; subcontrol-position: center right; width: 28px;
     border: none; background: transparent; }}
@@ -99,6 +99,9 @@ QComboBox QAbstractItemView {{
     background: {SURFACE}; border: 1px solid {LINE}; border-radius: 8px; outline: none; padding: 4px;
     selection-background-color: {SURFACE2};
 }}
+QComboBox QAbstractItemView::item {{ min-height: 28px; padding: 0 8px; border-radius: 5px; }}
+QComboBox QAbstractItemView::item:hover {{ background: #1B2735; }}
+QComboBox QAbstractItemView::item:selected {{ background: {SURFACE2}; color: {TEXT}; }}
 QSpinBox {{ padding-right: 24px; }}
 QSpinBox::up-button, QSpinBox::down-button {{ subcontrol-origin: border; width: 22px; border: none;
     background: transparent; }}

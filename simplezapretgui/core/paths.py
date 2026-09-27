@@ -11,6 +11,7 @@ from pathlib import Path
 
 APP_NAME = "SimpleZapretGUI"
 APP_VERSION = "1.0.0"
+APP_REPO_URL = "https://github.com/gaboter/SimpleZapretGUI"
 
 REPO_OWNER = "Flowseal"
 REPO_NAME = "zapret-discord-youtube"

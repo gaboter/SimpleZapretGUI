@@ -6,8 +6,8 @@ from PySide6.QtWidgets import (QComboBox, QLineEdit, QMessageBox, QScrollArea, Q
 
 from ...core import diagnostics, log
 from .. import icons, theme
-from ..widgets import (Dot, Segmented, StrategyCombo, Switch, button, card, flow, hbox, label, run_bg,
-                       vbox)
+from ..widgets import (CardGrid, Dot, Segmented, StrategyCombo, Switch, button, card, flow, hbox, label,
+                       run_bg, vbox)
 
 STATE_RU = {"RUNNING": "работает", "STOPPED": "остановлена", "STOP_PENDING": "зависла при остановке",
             "START_PENDING": "запускается", "": "не установлена"}
@@ -44,9 +44,8 @@ class ServicePage(QWidget):
         root.addWidget(label("Сервис", "h1"))
         root.addWidget(label("Всё, что умеет service.bat, — без консоли. Состояние обновляется "
                              "в реальном времени.", "muted", wrap=True))
-        grid = QVBoxLayout()          # одна колонка — удобно и в узком окне
-        grid.setSpacing(12)
-        root.addLayout(grid)
+        grid = CardGrid(min_card_width=380)     # столбцов столько, сколько помещается по ширине
+        root.addWidget(grid)
 
         # --- служба
         c, l = section("Служба zapret", "Служба запускает обход вместе с Windows, даже без приложения.")
@@ -64,7 +63,7 @@ class ServicePage(QWidget):
         l.addWidget(self.wd_state)
         l.addWidget(self.svc_combo)
         l.addWidget(flow(self.svc_install, self.svc_remove, spacing=8))
-        grid.addWidget(c)
+        grid.add(c)
 
         # --- Game Filter
         c, l = section("Game Filter", "Обход для игр: широкий диапазон портов TCP/UDP через IPSet.")
@@ -80,7 +79,7 @@ class ServicePage(QWidget):
         l.addWidget(flow(self.gf_mode))
         l.addLayout(hbox(label("TCP:", "muted"), self.gf_tcp, label("UDP:", "muted"), self.gf_udp))
         l.addLayout(hbox(label("Пример: 1024-1934,1936-65535", "faint"), None, gf_apply))
-        grid.addWidget(c)
+        grid.add(c)
 
         # --- IPSet
         c, l = section("IPSet Filter", "Какие IP обрабатывать помимо списков доменов.")
@@ -89,7 +88,7 @@ class ServicePage(QWidget):
         self.ip_upd = button("Обновить список IP", icon=icons.icon("download"))
         self.ip_upd.clicked.connect(self._update_ipset)
         l.addWidget(flow(self.ip_mode, self.ip_upd, spacing=8))
-        grid.addWidget(c)
+        grid.add(c)
 
         # --- фейки
         c, l = section("Активные фейки", "Какой фейковый пакет использовать для Discord UDP и игр.")
@@ -101,7 +100,7 @@ class ServicePage(QWidget):
         l.addLayout(hbox(label("Game Filter UDP", "muted"), None, self.fake_game))
         for cb in (self.fake_discord, self.fake_game):
             cb.setMinimumWidth(220)
-        grid.addWidget(c)
+        grid.add(c)
 
         # --- hosts
         c, l = section("Файл hosts", "Записи из репозитория (GitHub и др.). Приложение добавляет их "
@@ -115,7 +114,7 @@ class ServicePage(QWidget):
         h_rm.clicked.connect(self._remove_hosts)
         l.addWidget(self.hosts_state)
         l.addWidget(flow(self.h_check, self.h_upd, h_rm, spacing=8))
-        grid.addWidget(c)
+        grid.add(c)
 
         # --- обновления батников
         c, l = section("Проверка обновлений в батниках",
@@ -127,7 +126,7 @@ class ServicePage(QWidget):
         self.upd_now = button("Проверить обновления zapret", icon=icons.icon("refresh"))
         self.upd_now.clicked.connect(self._check_updates)
         l.addWidget(flow(self.upd_now))
-        grid.addWidget(c)
+        grid.add(c)
 
         # --- диагностика
         c, l = section("Диагностика", "Поиск конфликтов и типичных проблем (BFE, VPN, прокси, "
@@ -137,7 +136,7 @@ class ServicePage(QWidget):
         self.diag_box = vbox(spacing=6)
         l.addWidget(flow(self.run_d))
         l.addLayout(self.diag_box)
-        grid.addWidget(c)
+        grid.add(c, full=True)
         root.addStretch(1)
 
         ctl.status_changed.connect(self._render_status)

@@ -236,7 +236,7 @@ class Controller(QObject):
         self.health = {}
         self.health_changed.emit({})
         self._expect_stop = True
-        self._action("Остановка...", work, "Обход остановлен")
+        self._action("Остановка...", work, after=lambda _: log.warn("Обход остановлен"))
 
     def unload_driver(self, finished: Optional[Callable] = None):
         self._action("Выгрузка драйвера WinDivert...", self.zap.unload_driver, "Драйвер WinDivert выгружен",
@@ -292,7 +292,8 @@ class Controller(QObject):
         self._expect_stop = True
         self.health = {}
         self.health_changed.emit({})
-        self._action("Выключение...", self.zap.shutdown_everything, "Выключено", finished=finished)
+        self._action("Выключение...", self.zap.shutdown_everything,
+                     after=lambda r: log.warn(f"Обход выключен{': ' + r if r else ''}"), finished=finished)
 
     def set_mode(self, mode: str):
         """Сеанс или служба. Если обход уже работает от приложения — перезапустить в новом режиме."""

@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (QFileDialog, QMessageBox, QPlainTextEdit, QScroll
                                QWidget)
 
 from ...core import log, system, winutil
-from ...core.paths import APP_VERSION, DATA_ROOT, LOG_DIR, RELEASES_PAGE, ZAPRET_DIR
+from ...core.paths import APP_REPO_URL, APP_VERSION, DATA_ROOT, LOG_DIR, RELEASES_PAGE, ZAPRET_DIR
 from .. import icons, theme
 from ..widgets import Dot, Switch, button, card, flow, hbox, label, vbox
 
@@ -135,11 +135,14 @@ class SettingsPage(QWidget):
         l3.addWidget(label("Графическая оболочка для zapret-discord-youtube (Flowseal). Приложение не "
                            "изменяет zapret, а управляет его отдельной копией.", "muted", wrap=True))
         l3.addWidget(label(f"Данные: {DATA_ROOT}", "faint"))
-        gh = button("Релизы zapret на GitHub", "link")
+        app_gh = button("SimpleZapretGUI на GitHub", "link", icons.icon("external", theme.ACCENT, size=14),
+                        APP_REPO_URL)
+        app_gh.clicked.connect(lambda: winutil.open_path(APP_REPO_URL))
+        gh = button("Релизы zapret на GitHub", "link", icons.icon("external", theme.ACCENT, size=14))
         gh.clicked.connect(lambda: winutil.open_path(RELEASES_PAGE))
-        logs = button("Папка журналов", "link")
+        logs = button("Папка журналов", "link", icons.icon("folder", theme.ACCENT, size=14))
         logs.clicked.connect(lambda: winutil.open_path(str(LOG_DIR)))
-        l3.addWidget(flow(gh, logs))
+        l3.addWidget(flow(app_gh, gh, logs))
         root.addWidget(c3)
         root.addStretch(1)
 

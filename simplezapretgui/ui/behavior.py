@@ -4,13 +4,39 @@ from __future__ import annotations
 import ctypes
 
 from PySide6.QtCore import QEasingCurve, QEvent, QObject, QPropertyAnimation, Qt
-from PySide6.QtWidgets import (QAbstractItemView, QAbstractScrollArea, QApplication, QPlainTextEdit,
-                               QScrollBar, QTextEdit, QWidget)
+from PySide6.QtWidgets import (QAbstractItemView, QAbstractScrollArea, QApplication, QComboBox,
+                               QPlainTextEdit, QScrollBar, QStyle, QTextEdit, QWidget)
 
 from ..core.paths import IS_WINDOWS
 
 STEP_PX = 110          # прокрутка на один «щелчок» колеса, px
 DURATION = 230         # длительность анимации, мс
+POPUP_ROWS = 9         # выпадающий список показывает не больше 9 строк, дальше — скролл
+
+
+def fit_combo_popup(combo: QComboBox) -> None:
+    """Ширина выпадающего списка — по самому длинному пункту (но не уже самого селекта)."""
+    view = combo.view()
+    fm = view.fontMetrics()
+    widest = 0
+    for i in range(combo.count()):
+        widest = max(widest, fm.horizontalAdvance(combo.itemText(i)))
+    extra = int(combo.property("popupExtra") or 0)          # иконки/бейджи в своих делегатах
+    scroll = combo.style().pixelMetric(QStyle.PM_ScrollBarExtent) if combo.count() > POPUP_ROWS else 0
+    w = widest + extra + 40 + scroll                          # отступы пункта и рамки списка
+    view.setMinimumWidth(max(w, combo.width()))
+
+
+def setup_combo(combo: QComboBox) -> None:
+    if combo.property("_szg_combo"):
+        return
+    combo.setProperty("_szg_combo", True)
+    combo.setMaxVisibleItems(POPUP_ROWS)
+    m = combo.model()
+    fit = lambda *_a: fit_combo_popup(combo)  # noqa: E731
+    for sig in (m.rowsInserted, m.rowsRemoved, m.modelReset, m.dataChanged):
+        sig.connect(fit)
+    fit()
 
 
 def _colorref(hex_color: str) -> int:
@@ -51,6 +77,10 @@ class AppBehavior(QObject):
         t = ev.type()
         if t == QEvent.Wheel:
             return self._wheel(obj, ev)
+        if t == QEvent.Polish and isinstance(obj, QComboBox):
+            setup_combo(obj)
+        elif t == QEvent.Resize and isinstance(obj, QComboBox) and obj.property("_szg_combo"):
+            fit_combo_popup(obj)
         if t == QEvent.Polish and isinstance(obj, QAbstractItemView):
             obj.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
             obj.setHorizontalScrollMode(QAbstractItemView.ScrollPerPixel)

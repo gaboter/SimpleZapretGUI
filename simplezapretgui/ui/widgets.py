@@ -343,9 +343,9 @@ class StrategyCombo(QComboBox):
         super().__init__()
         self.setItemDelegate(StrategyDelegate(self))
         self.setMinimumHeight(40)
-        self.setMaxVisibleItems(14)
+        self.setMaxVisibleItems(9)
         self.setCursor(Qt.PointingHandCursor)
-        self.view().setMinimumWidth(360)
+        self.setProperty("popupExtra", 84 + 70)     # батарейка слева и пометка «своя» справа
 
     def fill(self, items: list[dict], current: str = ""):
         """items: [{name, score, user, stale}] — уже отсортированы."""
@@ -794,3 +794,75 @@ class ScrollPage(QScrollArea):
         h = max(h, lay.totalMinimumSize().height())
         if self.page.minimumHeight() != h:
             self.page.setMinimumHeight(h)
+
+
+# ================================================================ карточки в несколько столбцов
+class CardGrid(QWidget):
+    """Карточки в столько столбцов, сколько помещается по ширине (минимум — одна колонка).
+
+    add(card, full=True) — карточка всегда на всю ширину (например, длинная диагностика).
+    """
+
+    def __init__(self, min_card_width: int = 380, spacing: int = 12):
+        super().__init__()
+        from PySide6.QtWidgets import QGridLayout
+        self.min_w = min_card_width
+        self.grid = QGridLayout(self)
+        self.grid.setContentsMargins(0, 0, 0, 0)
+        self.grid.setSpacing(spacing)
+        # минимальная ширина не должна зависеть от числа столбцов — иначе окно не сужается
+        self.grid.setSizeConstraint(QLayout.SetNoConstraint)
+        self.cards: list[tuple[QWidget, bool]] = []
+        self._cols = 0
+
+    def minimumSizeHint(self):
+        mw = max((c.minimumSizeHint().width() for c, _ in self.cards), default=0)
+        return QSize(mw, self.grid.minimumSize().height())
+
+    def hasHeightForWidth(self):
+        return True
+
+    def heightForWidth(self, w):
+        return self.grid.totalHeightForWidth(w) if self.grid.hasHeightForWidth() else \
+            self.grid.minimumSize().height()
+
+    def add(self, card_w: QWidget, full: bool = False):
+        lay = card_w.layout()
+        if lay is not None:
+            lay.addStretch(1)          # содержимое карточки прижато к верху, если соседняя выше
+        self.cards.append((card_w, full))
+        self._relayout(force=True)
+
+    def _columns(self) -> int:
+        sp = self.grid.horizontalSpacing()
+        w = self.width() or 800
+        return max(1, (w + sp) // (self.min_w + sp))
+
+    def _relayout(self, force: bool = False):
+        cols = self._columns()
+        if cols == self._cols and not force:
+            return
+        self._cols = cols
+        for w, _ in self.cards:
+            self.grid.removeWidget(w)
+        for c in range(self.grid.columnCount()):
+            self.grid.setColumnStretch(c, 0)
+        row = col = 0
+        for w, full in self.cards:
+            if full:
+                if col:
+                    row, col = row + 1, 0
+                self.grid.addWidget(w, row, 0, 1, cols)
+                row += 1
+                continue
+            self.grid.addWidget(w, row, col)
+            col += 1
+            if col >= cols:
+                row, col = row + 1, 0
+        for c in range(cols):
+            self.grid.setColumnStretch(c, 1)
+
+    def resizeEvent(self, e):
+        super().resizeEvent(e)
+        self._relayout()
+        self.updateGeometry()

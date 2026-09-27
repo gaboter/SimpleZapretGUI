@@ -113,7 +113,7 @@ class StatusBar(QWidget):
             txt = "Обход включён" + (f" · {st.strategy}" if st.strategy else "") + (f" · {src}" if src else "")
             col = theme.OK if st.source != "external" else theme.WARN
         else:
-            txt, col = "Обход выключен", theme.MUTED
+            txt, col = "Обход выключен", theme.WARN
         self.text.setText(txt)
         self.text.setStyleSheet(f"color:{col}; font-size:12px;")
         self.spin.set_state(False, col)
