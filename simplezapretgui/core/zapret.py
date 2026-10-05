@@ -184,7 +184,46 @@ class Zapret:
                                   + (f":\n{out}" if out else " (возможен конфликт с другим обходом или антивирусом)"))
             time.sleep(0.1)
 
-    def _reader(self, proc: subprocess.Popen) -> None:
+    def start_raw(self, args: list[str], wait: float = 0.6, name: str = "подбор") -> None:
+        """Запустить winws с готовым списком параметров (для подбора стратегии)."""
+        if not IS_WINDOWS:
+            raise ZapretError("запуск winws возможен только в Windows")
+        with self._lock:
+            self.stop_process()
+            self._proc_output = []
+            try:
+                self._proc = subprocess.Popen(
+                    [str(self.winws), *args], cwd=str(self.bin_dir),
+                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
+                    creationflags=winutil.CREATE_NO_WINDOW, startupinfo=winutil.startupinfo())
+            except OSError as e:
+                raise ZapretError(f"не удалось запустить winws.exe: {e}") from e
+            self._proc_strategy = name
+            threading.Thread(target=self._reader, args=(self._proc,), kwargs={"quiet": True},
+                             daemon=True).start()
+        t0 = time.time()
+        while time.time() - t0 < wait:
+            if self._proc is None or self._proc.poll() is not None:
+                out = " ".join(self._proc_output[-3:]).strip()
+                self._proc = None
+                raise ZapretError(out or "winws не принял параметры")
+            time.sleep(0.05)
+
+    def wait_ready(self, timeout: float = 4.0) -> bool:
+        """Дождаться, пока winws начнёт перехват («windivert initialized. capture is started.»).
+
+        Старые сборки могут не писать эту строку — тогда просто ждём timeout, пока процесс жив.
+        """
+        t0 = time.time()
+        while time.time() - t0 < timeout:
+            if self._proc is None or self._proc.poll() is not None:
+                return False
+            if any("capture is started" in ln or "windivert initialized" in ln for ln in self._proc_output):
+                return True
+            time.sleep(0.05)
+        return self._proc is not None and self._proc.poll() is None
+
+    def _reader(self, proc: subprocess.Popen, quiet: bool = False) -> None:
         try:
             for raw in iter(proc.stdout.readline, b""):
                 line = winutil._decode(raw).rstrip()
@@ -192,12 +231,12 @@ class Zapret:
                     self._proc_output.append(line)
                     del self._proc_output[:-300]
                     low = line.lower()
-                    if "error" in low or "could not" in low or "failed" in low:
+                    if not quiet and ("error" in low or "could not" in low or "failed" in low):
                         log.error(f"winws: {line}")
         except Exception:
             pass
         code = proc.poll()
-        if proc is self._proc and code is not None:
+        if proc is self._proc and code is not None and not quiet:
             log.error(f"winws.exe неожиданно завершился (код {code})")
 
     def process_output(self) -> list[str]:

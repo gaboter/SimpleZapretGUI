@@ -27,6 +27,7 @@ DEFAULTS: dict[str, Any] = {
     "skipped_version": "",
     "skipped_app_version": "",       # «Позже» для новой версии SimpleZapretGUI
     "resume_after_update": "",       # стратегия, которую включить после самообновления
+    "builder_sites": [],             # свои сайты для группы «Другие сайты» в подборе
 }
 
 

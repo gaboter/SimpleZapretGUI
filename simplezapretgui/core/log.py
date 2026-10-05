@@ -73,6 +73,17 @@ def trace(text: str) -> None:
             pass
 
 
+def detail(text: str) -> None:
+    """Подробный ход длинных операций (подбор стратегии): одной строкой только в файл, без показа в UI."""
+    with _lock:
+        try:
+            LOG_DIR.mkdir(parents=True, exist_ok=True)
+            with open(LOG_DIR / "app.log", "a", encoding="utf-8") as f:
+                f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} [ПОДБОР] {text.rstrip()}\n")
+        except Exception:
+            pass
+
+
 def rotate() -> None:
     p = LOG_DIR / "app.log"
     try:

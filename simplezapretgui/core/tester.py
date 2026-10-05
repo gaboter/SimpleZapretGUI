@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import http.client
+import itertools
 import re
 import shutil
 import socket
@@ -112,9 +113,45 @@ def _classify(e: BaseException) -> str:
     return "ERROR"
 
 
+class _PinnedHTTPS(http.client.HTTPSConnection):
+    """HTTPS на заранее известный IP: без повторного DNS-запроса, но с правильным именем сайта (SNI)."""
+
+    def __init__(self, host: str, ip: str, **kw):
+        super().__init__(host, **kw)
+        self._ip = ip
+
+    def connect(self):
+        sock = socket.create_connection((self._ip, self.port), self.timeout)
+        self.sock = self._context.wrap_socket(sock, server_hostname=self.host)
+
+
+def resolve_ipv4(host: str) -> Optional[str]:
+    ips = resolve_all_ipv4(host)
+    return ips[0] if ips else None
+
+
+def resolve_all_ipv4(host: str) -> list[str]:
+    """Все IPv4-адреса сайта. У крупных сайтов (Discord, Cloudflare, Google) их несколько, и провайдер
+    может по-разному обращаться с разными адресами — поэтому проверяем по очереди все, как браузер."""
+    try:
+        infos = socket.getaddrinfo(host, 443, family=socket.AF_INET, proto=socket.IPPROTO_TCP)
+    except OSError:
+        return []
+    return list(dict.fromkeys(i[4][0] for i in infos))
+
+
+_rr = itertools.count()                  # чередование адресов от проверки к проверке
+
+
 def check_https(host: str, path: str, version: Optional[ssl.TLSVersion], timeout: float,
-                read_body: int = 0) -> str:
-    conn = http.client.HTTPSConnection(host, 443, timeout=timeout, context=_ctx(version))
+                read_body: int = 0, ip=None) -> str:
+    """ip — заранее известный адрес или список адресов (тогда они чередуются от проверки к проверке)."""
+    if isinstance(ip, (list, tuple)):
+        ip = ip[next(_rr) % len(ip)] if ip else None
+    if ip:
+        conn = _PinnedHTTPS(host, ip, port=443, timeout=timeout, context=_ctx(version))
+    else:
+        conn = http.client.HTTPSConnection(host, 443, timeout=timeout, context=_ctx(version))
     try:
         conn.request("GET" if read_body else "HEAD", path or "/",
                      headers={"User-Agent": "Mozilla/5.0 SimpleZapretGUI-test", "Accept": "*/*"})
@@ -164,25 +201,66 @@ def check_target(t: Target, timeout: float) -> dict:
 
 
 def score_details(details: list[dict]) -> tuple[int, int]:
+    """Оценка стратегии. «н/д» (сервер не поддерживает протокол) и «нет DNS» (адрес сайта не определился)
+    от стратегии не зависят — zapret DNS не трогает, — поэтому на оценку не влияют."""
     ok = total = 0
     for d in details:
         for v in d.get("tests", {}).values():
-            if v == "UNSUP":
+            if v in ("UNSUP", "DNS"):
                 continue
             total += 1
             ok += v == "OK"
     return ok, total
 
 
-def _one_check(t: Target, label: str, ver, body: int, timeout: float, cancel: threading.Event) -> str:
+def _one_check(t: Target, label: str, ver, body: int, timeout: float, cancel: threading.Event,
+               ip: Optional[str] = None) -> str:
     if cancel.is_set():
         return "ERROR"
     path = "/" + re.sub(r"^https?://[^/]+/?", "", t.url)
-    return check_https(t.host, path, ver, timeout, body)
+    return check_https(t.host, path, ver, timeout, body, ip=ip)
+
+
+# Фронтенды Google обслуживают все домены YouTube: если DNS не отдал адрес youtube.com,
+# соединяемся с адресом этих серверов (имя сайта при этом передаётся правильное — сертификат проверяется).
+GOOGLE_FRONTENDS = ("www.google.com", "www.gstatic.com", "i.ytimg.com", "youtubei.googleapis.com")
+YOUTUBE_SUFFIXES = ("youtube.com", "youtu.be")
+
+
+def pin_targets(targets: list[Target], tries: int = 3) -> tuple[dict, list]:
+    """Определить адреса целей один раз за тест (с повторами).
+
+    При десятках одновременных проверок Windows начинает отвечать на DNS-запросы отказом — и проверка
+    проваливалась бы из-за «DNS», а не из-за стратегии. Возвращает (адреса, взятые_у_Google)."""
+    hosts = [t.host for t in targets if not t.ping_only]
+    pins: dict = {}
+
+    def resolve(h):
+        for i in range(tries):
+            ips = resolve_all_ipv4(h)
+            if ips:
+                return ips
+            time.sleep(0.3 * (i + 1))
+        return None
+
+    with ThreadPoolExecutor(max_workers=6) as ex:
+        for h, ip in zip(hosts, ex.map(resolve, hosts)):
+            if ip:
+                pins[h] = ip
+    borrowed = []
+    lost = [h for h in hosts if h not in pins and h.endswith(YOUTUBE_SUFFIXES)]
+    if lost:
+        donor = next((pins.get(d) or resolve_all_ipv4(d) for d in GOOGLE_FRONTENDS
+                      if pins.get(d) or resolve_all_ipv4(d)), None)
+        if donor:
+            for h in lost:
+                pins[h] = donor
+                borrowed.append(h)
+    return pins, borrowed
 
 
 def run_targets(targets: list[Target], timeout: float, parallel: int,
-                cancel: threading.Event) -> list[dict]:
+                cancel: threading.Event, pins: Optional[dict] = None) -> list[dict]:
     """Все проверки (цель × HTTP/TLS1.2/TLS1.3) идут параллельно — так тест в разы быстрее."""
     out = [{"name": t.name, "url": t.url, "tests": {}} for t in targets]
     with ThreadPoolExecutor(max_workers=max(1, parallel)) as ex:
@@ -192,7 +270,8 @@ def run_targets(targets: list[Target], timeout: float, parallel: int,
                 futs.append((i, "ping", ex.submit(ping, t.host)))
                 continue
             for label, ver, body in TESTS:
-                futs.append((i, label, ex.submit(_one_check, t, label, ver, body, timeout, cancel)))
+                futs.append((i, label, ex.submit(_one_check, t, label, ver, body, timeout, cancel,
+                                                 (pins or {}).get(t.host))))
         for i, label, f in futs:
             try:
                 r = f.result()
@@ -264,9 +343,13 @@ class TestRunner:
         self.on_result = on_result
         self.targets = targets
         self.cancel = threading.Event()
+        self.pins: dict = {}
+        self.dns_borrowed: list = []
 
     def run(self) -> list[StrategyResult]:
         targets = self.targets or load_targets()
+        # адреса один раз за весь тест: обход DNS не трогает, а шторм DNS-запросов давал ложные «нет DNS»
+        self.pins, self.dns_borrowed = pin_targets(targets)
         if not targets:
             raise RuntimeError("список целей пуст — добавьте цели во вкладке «Тесты»")
         st = self.zap.status()
@@ -313,7 +396,7 @@ class TestRunner:
                 return StrategyResult(name, 0, 0, 0, [], str(e))
             time.sleep(0.5)
         try:
-            details = run_targets(targets, self.timeout, self.parallel, self.cancel)
+            details = run_targets(targets, self.timeout, self.parallel, self.cancel, self.pins)
         finally:
             if name != self.BASELINE:
                 self.zap.stop_process()

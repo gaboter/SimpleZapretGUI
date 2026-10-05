@@ -28,14 +28,14 @@ def score_color(score: float | None) -> str:
     return ERR
 
 
-def _asset(name: str, body: str) -> str:
+def _asset(name: str, body: str, color: str = MUTED, width: float = 2.2) -> str:
     """SVG для QSS (стрелки селектов/спинбоксов) — пишется во временную папку приложения."""
     from ..core.paths import TEMP_DIR
     d = TEMP_DIR / "ui"
     d.mkdir(parents=True, exist_ok=True)
     f = d / name
-    data = (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="{MUTED}" '
-            f'stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">{body}</svg>')
+    data = (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="{color}" '
+            f'stroke-width="{width}" stroke-linecap="round" stroke-linejoin="round">{body}</svg>')
     try:
         if not f.exists() or f.read_text(encoding="utf-8") != data:
             f.write_text(data, encoding="utf-8")
@@ -47,6 +47,7 @@ def _asset(name: str, body: str) -> str:
 def build_qss() -> str:
     down = _asset("chevron-down.svg", '<path d="M6 9l6 6 6-6"/>')
     up = _asset("chevron-up.svg", '<path d="M6 15l6-6 6 6"/>')
+    check = _asset("check.svg", '<path d="M5 12.5l4.5 4.5L19 7.5"/>', "#06111D", 3.2)
     return f"""
 * {{ font-family: {FONT}; font-size: 13px; color: {TEXT}; }}
 QMainWindow, QWidget#root, QDialog, QMessageBox, QInputDialog {{ background: {BG}; }}
@@ -127,10 +128,14 @@ QTableCornerButton::section {{ background: {SURFACE}; border: none; }}
 QCheckBox {{ spacing: 8px; background: transparent; }}
 QCheckBox::indicator {{ width: 16px; height: 16px; border-radius: 4px; border: 1px solid #3A4A5E;
     background: {SURFACE}; }}
-QCheckBox::indicator:checked {{ background: {ACCENT}; border-color: {ACCENT}; }}
+QCheckBox::indicator:checked {{ background: {ACCENT}; border-color: {ACCENT}; image: url("{check}"); }}
+QCheckBox::indicator:hover {{ border-color: {ACCENT}; }}
 QTreeView::indicator {{ width: 15px; height: 15px; border-radius: 4px; border: 1px solid #3A4A5E;
     background: {BG}; }}
-QTreeView::indicator:checked {{ background: {ACCENT}; border-color: {ACCENT}; }}
+QTreeView::indicator:checked {{ background: {ACCENT}; border-color: {ACCENT}; image: url("{check}"); }}
+QListView::indicator {{ width: 15px; height: 15px; border-radius: 4px; border: 1px solid #3A4A5E;
+    background: {BG}; }}
+QListView::indicator:checked {{ background: {ACCENT}; border-color: {ACCENT}; image: url("{check}"); }}
 QRadioButton::indicator {{ width: 14px; height: 14px; border-radius: 8px; border: 1px solid #3A4A5E;
     background: {SURFACE}; }}
 QRadioButton::indicator:checked {{ background: {ACCENT}; border: 3px solid {SURFACE}; }}

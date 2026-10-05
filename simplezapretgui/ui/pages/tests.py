@@ -27,7 +27,7 @@ RES_TIP = {
     "TIMEOUT": "Нет ответа за отведённое время: ресурс заблокирован или очень медленный.",
     "RESET": "Соединение сброшено — обычно так срабатывает блокировка провайдера.",
     "SSL": "Ошибка защищённого соединения — провайдер вмешивается в TLS.",
-    "DNS": "Не удалось узнать адрес сайта: проблема с DNS, а не со стратегией.",
+    "DNS": "Не удалось узнать адрес сайта: проблема с DNS, а не со стратегией. На оценку не влияет.",
     "UNSUP": "Сервер не поддерживает этот вариант протокола. Это не ошибка, на оценку не влияет.",
     "ERROR": "Другая ошибка соединения.",
 }
@@ -398,8 +398,14 @@ class TestsPage(QWidget):
         self.ctl.test_progress.emit(0, total, "")
         started = time.time()
 
+        runner = self.runner
+
         def done(results):
             self._finish()
+            if runner.dns_borrowed:
+                log.warn("Ваш DNS не отдаёт адрес " + ", ".join(runner.dns_borrowed) + " — проверено через адрес "
+                         "серверов Google. Браузер может не открывать эти сайты независимо от стратегии; помогает "
+                         "DNS-over-HTTPS (Параметры Windows → Сеть и Интернет → DNS-сервер → 1.1.1.1 с шифрованием)")
             ok = [r for r in results if r.name != TestRunner.BASELINE and not r.error]
             if ok:
                 best = max(ok, key=lambda r: r.score)

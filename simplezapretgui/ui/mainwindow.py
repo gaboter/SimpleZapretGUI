@@ -13,6 +13,7 @@ from .controller import Controller
 from .search import FindBar
 from .taskbar import TaskbarProgress
 from .widgets import ScrollPage
+from .pages.builder import BuilderPage
 from .pages.home import HomePage
 from .pages.lists import ListsPage
 from .pages.service import ServicePage
@@ -148,6 +149,7 @@ class StatusBar(QWidget):
 
 class MainWindow(QMainWindow):
     PAGES = [("home", "power", "Главная"), ("strategies", "sliders", "Стратегии"),
+             ("builder", "wand", "Подбор стратегии"),
              ("lists", "globe", "Списки ресурсов"), ("tests", "gauge", "Автотест"),
              ("service", "tools", "Сервис"), ("settings", "cog", "Настройки"), ("log", "log", "Журнал")]
 
@@ -189,9 +191,16 @@ class MainWindow(QMainWindow):
         service = ServicePage(ctl)
         run_test = lambda names: (self.go_to("tests"), tests.run(names))  # noqa: E731
         run_diag = lambda: (self.go_to("service"), service.run_diagnostics())  # noqa: E731
+        strategies = StrategiesPage(ctl, self.go_to, run_test)
+
+        def open_strategy(name):
+            self.go_to("strategies")
+            strategies._select_name(name)
+
         pages = {
             "home": HomePage(ctl, self.go_to, run_test, run_diag),
-            "strategies": StrategiesPage(ctl, self.go_to, run_test),
+            "strategies": strategies,
+            "builder": BuilderPage(ctl, open_strategy, run_test),
             "lists": ListsPage(ctl),
             "tests": tests,
             "service": service,
@@ -223,7 +232,8 @@ class MainWindow(QMainWindow):
                 sl.addWidget(sb, 0, Qt.AlignHCenter)
             sl.addWidget(b, 0, Qt.AlignHCenter)
             self.pages[key] = pages[key]
-            holder = ScrollPage(pages[key]) if key in ("home", "strategies", "lists", "tests") else pages[key]
+            holder = ScrollPage(pages[key]) if key in ("home", "strategies", "builder", "lists", "tests") \
+                else pages[key]
             self.holders[key] = holder
             self.stack.addWidget(holder)
         # --- поиск (Ctrl+F) над страницами
@@ -267,6 +277,7 @@ class MainWindow(QMainWindow):
         ctl.update_available.connect(self._tray_update)
         ctl.test_progress.connect(self._test_progress)
         ctl.test_finished.connect(self._test_finished)
+        ctl.builder_finished.connect(lambda: self._test_finished("Подбор стратегии завершён"))
         ctl.app_update_available.connect(self._tray_app_update)
         ctl.quit_for_update.connect(lambda: self.quit(force=True))
 
@@ -308,11 +319,11 @@ class MainWindow(QMainWindow):
         if self.isVisible():
             self.taskbar.set_progress(int(self.winId()), done, total)
 
-    def _test_finished(self):
+    def _test_finished(self, message: str = "Автотест стратегий завершён"):
         self._test_frac = None
         self._apply_icons()
         self.taskbar.clear(int(self.winId()))
-        self.tray.showMessage(APP_NAME, "Автотест стратегий завершён", icons.app_icon(self._arrow), 5000)
+        self.tray.showMessage(APP_NAME, message, icons.app_icon(self._arrow), 5000)
 
     def _tray_error(self, msg: str):
         if msg and not self.isVisible():

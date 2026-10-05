@@ -48,6 +48,8 @@ _P = {
     "external": '<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
     "chevron": '<path d="M6 9l6 6 6-6"/>',
     "chevron_up": '<path d="M6 15l6-6 6 6"/>',
+    "wand": ('<path d="M4 20L14.5 9.5"/><path d="M13 8l3 3"/><path d="M17 3v3M15.5 4.5h3"/>'
+             '<path d="M20 9.5v2M19 10.5h2"/><path d="M9.5 3.5v2M8.5 4.5h2"/>'),
     "close": '<path d="M6 6l12 12M18 6L6 18"/>',
 }
 

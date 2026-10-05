@@ -36,6 +36,7 @@ class Controller(QObject):
     health_checking = Signal(bool)
     app_update_available = Signal(object)   # AppRelease — новая версия SimpleZapretGUI
     quit_for_update = Signal()              # установщик запущен — приложению пора закрыться
+    builder_finished = Signal()             # подбор стратегии закончен
 
     def __init__(self):
         super().__init__()
