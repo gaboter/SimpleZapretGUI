@@ -67,6 +67,7 @@ class Controller(QObject):
             self.zap.disable_bat_update_check()
             self.zap.ensure_user_lists()
             ensure_targets_file(self.zap.utils_dir)
+        self._cleanup_leftover_driver()
         self.refresh_status()
         self.poll.start()
         self.health_timer.start(max(20, int(self.settings.get("health_interval"))) * 1000)
@@ -82,6 +83,27 @@ class Controller(QObject):
             QTimer.singleShot(1500, lambda: self.connect(resume, "session"))
         elif self.zap.installed() and self.settings.get("auto_connect_on_start"):
             QTimer.singleShot(1200, self._auto_connect)
+
+    def _cleanup_leftover_driver(self):
+        """Драйвер WinDivert мог остаться от прошлого сеанса (например, после выключения компьютера).
+        Если он точно ничей (нет winws, других обходов и службы zapret) — выгружаем, чтобы не пугать
+        предупреждением на главной."""
+        if not self.zap.installed():
+            return
+        from ..core import session
+
+        def done(freed):
+            if freed:
+                log.info("Выгружен драйвер WinDivert, оставшийся от прошлого сеанса")
+                self.refresh_status()
+
+        run_bg(lambda: session.leftover_driver_cleanup(self.zap), done, lambda _e: None)
+
+    def session_ending(self):
+        """Windows завершает работу: отключить обход, чтобы после включения не остался драйвер."""
+        from ..core import session
+        log.info("Windows завершает работу — отключаю обход")
+        log.info("Завершение работы: " + session.session_end_cleanup(self.zap))
 
     def _auto_connect(self):
         st = self.status

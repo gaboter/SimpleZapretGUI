@@ -11,9 +11,11 @@ from ..core.paths import APP_NAME, APP_VERSION
 from . import icons, theme
 from .controller import Controller
 from .search import FindBar
+from .session import is_session_ending
 from .taskbar import TaskbarProgress
 from .widgets import ScrollPage
 from .pages.builder import BuilderPage
+from .pages.detector import DetectorPage
 from .pages.home import HomePage
 from .pages.lists import ListsPage
 from .pages.service import ServicePage
@@ -149,7 +151,7 @@ class StatusBar(QWidget):
 
 class MainWindow(QMainWindow):
     PAGES = [("home", "power", "Главная"), ("strategies", "sliders", "Стратегии"),
-             ("builder", "wand", "Подбор стратегии"),
+             ("builder", "wand", "Подбор стратегии"), ("detector", "shield", "Детектор блокировок"),
              ("lists", "globe", "Списки ресурсов"), ("tests", "gauge", "Автотест"),
              ("service", "tools", "Сервис"), ("settings", "cog", "Настройки"), ("log", "log", "Журнал")]
 
@@ -201,6 +203,7 @@ class MainWindow(QMainWindow):
             "home": HomePage(ctl, self.go_to, run_test, run_diag),
             "strategies": strategies,
             "builder": BuilderPage(ctl, open_strategy, run_test),
+            "detector": DetectorPage(ctl),
             "lists": ListsPage(ctl),
             "tests": tests,
             "service": service,
@@ -232,7 +235,7 @@ class MainWindow(QMainWindow):
                 sl.addWidget(sb, 0, Qt.AlignHCenter)
             sl.addWidget(b, 0, Qt.AlignHCenter)
             self.pages[key] = pages[key]
-            holder = ScrollPage(pages[key]) if key in ("home", "strategies", "builder", "lists", "tests") \
+            holder = ScrollPage(pages[key]) if key in ("home", "strategies", "builder", "detector", "lists", "tests") \
                 else pages[key]
             self.holders[key] = holder
             self.stack.addWidget(holder)
@@ -360,9 +363,9 @@ class MainWindow(QMainWindow):
 
     # ------------------------------------------------------------ выход
     def closeEvent(self, e):
-        if self._quitting:
-            e.accept()
-            return
+        if self._quitting or is_session_ending():
+            e.accept()                   # Windows завершает работу: отказываться нельзя, иначе она сочтёт
+            return                       # программу помехой выключению
         if self.ctl.settings.get("close_to_tray") and QSystemTrayIcon.isSystemTrayAvailable():
             e.ignore()
             self.hide()

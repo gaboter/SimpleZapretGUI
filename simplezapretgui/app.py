@@ -160,6 +160,11 @@ def _main() -> int:
     ctl = Controller()
     win = MainWindow(ctl)
 
+    # при выключении Windows отключаем обход и выгружаем драйвер, чтобы он не остался до следующего включения
+    from .ui.session import SessionGuard
+    app._szg_session = SessionGuard(app, ctl.session_ending)
+    win.createWinId()                 # настоящее окно нужно и при запуске в трее: ему Windows шлёт сообщения о выключении
+
     server = QLocalServer()
     QLocalServer.removeServer(INSTANCE_KEY)
     server.listen(INSTANCE_KEY)
